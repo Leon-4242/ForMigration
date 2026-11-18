@@ -1,0 +1,154 @@
+Коржик — Telegram-бот для студенческого общежития (ДС / ДСЛ)
+=============================================================
+
+Стек: Python 3.11+, aiogram 3, SQLite, Google Sheets (gspread), APScheduler.
+
+
+Быстрый старт
+-------------
+
+1. Создать .env в корне проекта:
+       BOT_TOKEN=<токен от @BotFather>
+
+2. Положить ключ Google Sheets в:
+       data/auth/korjik-tgbot.json
+
+3. Установить зависимости и запустить:
+       python -m venv .venv && source .venv/bin/activate
+       pip install -r requirements-dev.txt
+       PYTHONPATH=src python src/main.py
+
+
+Структура каталогов
+-------------------
+
+bot_studcom_python/
+│
+├── data/                          # данные вне кода (не коммитить секреты и локальные БД)
+│   ├── auth/korjik-tgbot.json     # service account для Google Sheets
+│   ├── json/                      # настройки (подписки, расписание — для будущих модулей)
+│   ├── pics/                      # GIF для гороскопа (будущий модуль)
+│   └── sqlite_db/
+│       ├── users.sqlite           # пользователи бота
+│       └── messages.sqlite        # тексты команд и сообщений
+│
+├── src/
+│   ├── main.py                    # точка входа
+│   │
+│   ├── config/                    # конфигурация
+│   │   ├── environment.py         # BOT_TOKEN из .env
+│   │   ├── path.py                # пути к data/ и SQLite-файлам
+│   │   ├── google.py              # путь к ключу и ID таблицы
+│   │   └── settings.py            # флаги (AUTO_REGISTER_USERS и т.п.)
+│   │
+│   ├── core/                      # каркас приложения
+│   │   ├── application.py         # DI: собирает все компоненты и запускает бота
+│   │   ├── bot.py                 # обёртка над aiogram Bot + Dispatcher
+│   │   ├── filters/admin.py       # фильтр: пользователь — администратор
+│   │   └── middlewares/
+│   │       ├── registration.py    # регистрация пользователя, data["user"]
+│   │       └── service.py         # инъекция сервисов в хендлеры
+│   │
+│   ├── system/                    # системные команды (подключены к боту)
+│   │   ├── common/                # /start, /help, /feedback
+│   │   ├── admin/                 # /restart, /admin_help, /set_admin, /notify
+│   │   └── echo/                  # ответ на неизвестные сообщения
+│   │
+│   ├── infrastructure/            # внешние интеграции и фоновые задачи
+│   │   ├── services/
+│   │   │   ├── google_sheets.py   # чтение Google Sheets
+│   │   │   ├── database.py        # синхронизация таблицы → SQLite (сообщения)
+│   │   │   ├── messages.py        # работа с текстами сообщений
+│   │   │   ├── users.py           # работа с пользователями
+│   │   │   └── messenger.py       # отправка сообщений, рассылки
+│   │   └── scheduler/
+│   │       ├── main_scheduler.py  # обёртка APScheduler
+│   │       └── update_database.py # периодическое обновление БД (раз в час)
+│   │
+│   ├── database/                  # SQLite-репозитории (общие таблицы)
+│   │   ├── users.py               # id, имя, флаг admin
+│   │   └── messages.py            # type, id, text — тексты для команд
+│   │
+│   ├── models/                    # dataclass и enum домена
+│   │   ├── user.py
+│   │   ├── message.py
+│   │   └── sheet_types.py         # имена листов Google Sheets
+│   │
+│   └── modules/                   # ⚠ WIP — функциональные модули, пока НЕ подключены
+│       ├── base/                  # базовые классы для синхронизации Sheets → SQLite
+│       ├── dormitory/             # информация по корпусам (коменда, проверки, старосты)
+│       ├── consumer/              # столовая, магазин, прачечная, администрация
+│       └── horoscope/             # ежедневный гороскоп и подписки
+│
+├── pyproject.toml                 # настройки black, ruff, mypy, pytest
+├── requirements.txt
+└── requirements-dev.txt
+
+
+Как устроен запуск
+------------------
+
+main.py
+  └─ Application.initialize()
+       ├─ SQLite: users, messages
+       ├─ сервисы: Google Sheets, messenger, sync БД
+       ├─ middleware → data["user"], data["messenger"], data["messages"], data["users"]
+       ├─ роутеры: common → admin → echo (порядок важен)
+       └─ scheduler: UpdateDatabaseTask
+  └─ Application.start()
+       ├─ scheduler.start()
+       └─ bot.start(startup)  → polling
+
+При старте: синхронизация messages.sqlite из Google Sheets, уведомление админов.
+
+
+Поток данных
+------------
+
+Google Sheets  →  infrastructure/services/database.py  →  messages.sqlite
+                                                          ↓
+handlers (system/)  ←  middleware  ←  MessageService / UsersService
+                                                          ↓
+                                              MessengerService  →  Telegram
+
+
+Команды бота (system/)
+----------------------
+
+Пользовательские:
+    /start      — регистрация и приветствие
+    /help       — справка (текст из БД)
+    /feedback   — отзыв администраторам
+
+Админские (нужен флаг admin в users.sqlite):
+    /restart    — перезапуск бота
+    /admin_help — справка для админа
+    /set_admin  — назначить/снять админа
+    /notify     — рассылка всем пользователям
+
+Тексты команд хранятся в messages.sqlite (лист MESSAGES в Google Sheets).
+Меню команд Telegram (setup_commands) пока закомментировано в application.py.
+
+
+Проверка кода
+-------------
+
+source .venv/bin/activate
+
+# рабочий код (без WIP-модулей)
+ruff check src/core src/config src/database src/infrastructure src/models src/system src/main.py
+mypy  src/core src/config src/database src/infrastructure src/models src/system src/main.py
+black --check src/core src/config src/database src/infrastructure src/models src/system src/main.py
+
+# весь src/ — упадёт на modules/ (незавершённый код)
+ruff check src
+
+pytest   # тестов пока нет (tests/ не создан)
+
+
+Статус modules/
+---------------
+
+Каталог modules/ — задел под доменную логику (общежитие, бытовые сервисы, горoscope).
+Сейчас не импортируется из Application и содержит незавершённый код.
+После доработки модули подключаются через новые роутеры в initialize_routers().

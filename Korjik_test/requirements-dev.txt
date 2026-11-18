@@ -1,0 +1,6 @@
+-r requirements.txt
+
+black~=25.1
+ruff~=0.12
+pytest~=8.4
+mypy~=1.17
