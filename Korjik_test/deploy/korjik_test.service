@@ -1,27 +1,17 @@
 [Unit]
-Description=Korjik_test Telegram bot
-Wants=network-online.target
-After=network-online.target
+Description=Korjik test Bot
+After=network.target
 
 [Service]
 Type=simple
-User=korjik_test
-Group=korjik_test
-WorkingDirectory=/opt/Korjik_test
-EnvironmentFile=/etc/Korjik_test.env
-Environment=PYTHONUNBUFFERED=1
-Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/opt/Korjik_test/.venv/bin/python /opt/Korjik_test/src/main.py
+WorkingDirectory=/root/Korjik_test
+
+ExecStart=/bin/bash -c 'source /root/Korjik_test/.venv/bin/activate && python3 /root/Korjik_test/src/main.py'
+
 Restart=always
 RestartSec=3
-TimeoutStopSec=30
-UMask=0077
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=full
-ProtectHome=true
-ReadOnlyPaths=/opt/Korjik_test
-ReadWritePaths=/opt/Korjik_test/data
+
+Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target

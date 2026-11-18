@@ -1,27 +1,33 @@
 # Korjik_test deployment
 
+The layout matches the existing installation on `bots-server`:
+
+- application: `/root/Korjik_test`;
+- Telegram token: `/root/Korjik_test/.env`;
+- Google credentials: `/root/Korjik_test/data/auth/korjik-tgbot.json`;
+- virtual environment: `/root/Korjik_test/.venv`;
+- service: `korjik_test.service`.
+
 The repository intentionally contains no production secrets or user databases.
-Keep the Telegram token, Google service-account key, SQLite databases, and runtime
-JSON files on the target server only.
 
 ## Install
 
-From this directory on an Ubuntu/Debian server:
+Place the real secret files at their existing paths, then run the installer from
+this directory on an Ubuntu/Debian server:
 
 ```bash
-sudo install -o root -g root -m 0600 .env.example /etc/Korjik_test.env
-sudo editor /etc/Korjik_test.env
-
-sudo install -d -o root -g root -m 0750 /etc/Korjik_test
-sudo install -o root -g root -m 0600 /secure/path/google-service-account.json \
-  /etc/Korjik_test/google-service-account.json
+sudo install -d -o root -g root -m 0700 /root/Korjik_test/data/auth
+sudo install -o root -g root -m 0600 /secure/path/Korjik_test.env \
+  /root/Korjik_test/.env
+sudo install -o root -g root -m 0600 /secure/path/korjik-tgbot.json \
+  /root/Korjik_test/data/auth/korjik-tgbot.json
 
 sudo ./install.sh
 ```
 
-The installer creates a dedicated `korjik_test` system user, installs the app in
-`/opt/Korjik_test`, builds `/opt/Korjik_test/.venv`, installs dependencies, and
-enables `korjik_test.service` with automatic restart.
+The installer copies code to `/root/Korjik_test` when necessary, preserves the
+secret and runtime-data paths, builds `/root/Korjik_test/.venv`, installs
+dependencies, and enables `korjik_test.service` with automatic restart.
 
 Useful commands:
 
